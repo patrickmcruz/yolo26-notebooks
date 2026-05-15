@@ -10,3 +10,7 @@ venv/
 
 notebooks/.env
 notebooks/datasets/
+notebooks/_v/
+notebooks/yolo26m.pt
+notebooks/yolo26n.pt
+notebooks/yolo26x.pt

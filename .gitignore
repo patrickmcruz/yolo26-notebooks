@@ -18,3 +18,4 @@ notebooks/yolo26x.pt
 notebooks/test-setup-02-train-hparams/_v/
 notebooks/test-setup-02-train-hparams/datasets/
 notebooks/test-setup-02-train-hparams/results/
+notebooks/test-setup-02-train-hparams/runs/

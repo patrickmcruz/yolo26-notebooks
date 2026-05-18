@@ -2,7 +2,7 @@
 
 This repository now focuses on a single, practical workflow notebook:
 
-- [notebooks/test-setup-02-train-hparams.ipynb](notebooks/test-setup-02-train-hparams.ipynb)
+- [notebooks/test-setup-02-train-hparams/test-setup-02-train-hparams.ipynb](notebooks/test-setup-02-train-hparams/test-setup-02-train-hparams.ipynb)
 
 The notebook is structured to be modular, restart-safe, and easy to reason about on Windows. It uses centralized configuration, a managed folder layout, a fast validation preview, and two training profiles: a smoke test and a light scale-up branch.
 

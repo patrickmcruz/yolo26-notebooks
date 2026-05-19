@@ -8,6 +8,7 @@ venv/
 .DS_Store
 .ipynb_checkpoints
 
+## all notebooks
 notebooks/.env
 notebooks/datasets/
 notebooks/_v/
@@ -15,7 +16,23 @@ notebooks/results/
 notebooks/yolo26m.pt
 notebooks/yolo26n.pt
 notebooks/yolo26x.pt
+
+## notebook test-setup-02-train-hparams
 notebooks/test-setup-02-train-hparams/_v/
 notebooks/test-setup-02-train-hparams/datasets/
 notebooks/test-setup-02-train-hparams/results/
 notebooks/test-setup-02-train-hparams/runs/
+
+## notebook test-setup-03-run-few
+notebooks/test-setup-03-run-few/input
+notebooks/test-setup-03-run-few/yolo26x-pose.pt
+notebooks/test-setup-03-run-few/.cache/
+notebooks/test-setup-03-run-few/.yolo/
+notebooks/test-setup-03-run-few/output/
+
+## notebook test-setup-04-run-density
+notebooks/test-setup-04-run-density/input
+notebooks/test-setup-04-run-density/yolo26x-pose.pt
+notebooks/test-setup-04-run-density/.cache/
+notebooks/test-setup-04-run-density/.yolo/
+notebooks/test-setup-04-run-density/output/

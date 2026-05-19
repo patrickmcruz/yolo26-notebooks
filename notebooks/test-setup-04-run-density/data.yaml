@@ -1,0 +1,65 @@
+# Central configuration for the YOLO26 Pose person counting notebook.
+# Paths are relative to this folder unless they are absolute.
+
+app:
+  name: "test-setup-03-run-yolo26-pose-count"
+  install_requirements: false
+  requirements_file: "../../requirements.txt"
+  seed: 42
+
+environment:
+  YOLO_CONFIG_DIR: ".yolo"
+  MPLCONFIGDIR: ".cache/matplotlib"
+  TORCH_HOME: ".cache/torch"
+
+paths:
+  video: "input/20260329_34.mp4"
+  weights: "yolo26x-pose.pt"
+  weights_search_dirs:
+    - "../"
+    - "."
+  output_dir: "output"
+  annotated_video: "output/20260329_34_yolo26_pose_count.mp4"
+  frame_counts_csv: "output/frame_counts.csv"
+  summary_json: "output/summary.json"
+  snapshots_dir: "output/snapshots"
+
+runtime:
+  require_cuda: true
+  device: 0
+  batch_size: 16
+  auto_reduce_batch_on_oom: true
+  empty_cuda_cache_every_batches: 20
+  torch_float32_matmul_precision: "highest"
+  allow_tf32: false
+
+inference:
+  task: "pose"
+  imgsz: 1280
+  conf: 0.20
+  iou: 0.70
+  max_det: 1000
+  classes:
+    - 0
+  augment: true
+  half: false
+  verbose: false
+  vid_stride: 1
+
+counting:
+  count_source: "boxes"
+  require_keypoints: false
+  min_visible_keypoints: 3
+  min_keypoint_conf: 0.25
+
+output:
+  save_annotated_video: true
+  save_frame_counts: true
+  save_summary: true
+  save_snapshot_every_n_frames: 720
+  video_codec: "mp4v"
+  progress_every_n_frames: 720
+  overlay:
+    enabled: true
+    font_scale: 0.8
+    thickness: 2

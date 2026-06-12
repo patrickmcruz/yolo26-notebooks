@@ -1,0 +1,87 @@
+################################################################################
+# SETUP CONFIGURATION
+# Location: 01-setup/
+# Purpose: Environment setup and hardware analysis
+################################################################################
+
+category: setup
+description: Environment setup and hardware analysis
+directory: 01-setup
+
+# Notebooks in this category
+notebooks:
+  - setup-density-hardware-analysis.ipynb
+  - test-setup-01.ipynb
+
+# Dependencies required before running any notebooks
+dependencies:
+  core:
+    - ultralytics>=8.4.0
+    - torch>=2.0.0
+    - torchvision>=0.15.0
+    - supervision
+    - roboflow
+    
+  utilities:
+    - numpy
+    - pandas
+    - opencv-python
+    - psutil
+    - pyyaml
+    - matplotlib
+    
+  optional:
+    - jupyter
+    - jupyterlab
+    - ipywidgets
+
+# PyTorch installation (choose based on your GPU)
+pytorch_installation:
+  cuda118: |
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+  cuda121: |
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+  cpu_only: |
+    pip install torch torchvision torchaudio
+
+# Hardware requirements
+hardware_requirements:
+  cpu_cores_min: 2
+  ram_gb_min: 8
+  
+  gpu:
+    required: false  # optional but recommended
+    vram_gb_min: 4
+    vram_gb_recommended: 8
+    
+  storage_gb_required: 20  # for models and datasets
+
+# Estimated runtimes
+estimated_runtime_minutes: 15
+  
+# Outputs and artifacts
+expected_outputs:
+  - hardware_profile.json
+  - system_specs.txt
+  - gpu_info.json (if GPU available)
+  - validation_report.txt
+  
+# Setup notebook parameters
+setup_params:
+  fetch_sample_images: true
+  download_model_weights: true
+  disable_telemetry: true
+  
+# Validation checks
+validation_checks:
+  python_version: "3.8+"
+  check_packages: true
+  check_cuda: true
+  check_model_loading: true
+  test_inference: true
+
+# Environment variables (optional)
+environment_variables:
+  YOLOv5_DISABLE_ANALYTICS: "1"
+  CUDA_VISIBLE_DEVICES: "0"  # use first GPU
+  YOLO_VERBOSE: "1"

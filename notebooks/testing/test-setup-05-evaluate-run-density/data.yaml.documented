@@ -1,0 +1,103 @@
+# ============================================================================
+# YOLO26 Pose Person Counting - Density Run Configuration
+# ============================================================================
+# Central configuration for the YOLO26 Pose person counting notebook.
+# All paths are relative to this folder unless they are absolute paths.
+# ============================================================================
+
+# ============================================================================
+# APPLICATION SETTINGS
+# ============================================================================
+app:
+  name: "test-setup-05-run-density-yolo26-pose-count" # Unique identifier for this configuration. Used for logging and file naming.
+  install_requirements: false # If true, automatically installs Python packages from requirements_file. Set to true only if running in clean environment.
+  requirements_file: "../../requirements.txt" # Path to pip requirements file. Used only if install_requirements: true.
+  seed: 42 # Random seed for reproducibility of any random operations. Change this value to get different random initialization for different runs.
+
+# ============================================================================
+# ENVIRONMENT VARIABLES
+# ============================================================================
+# These directories store YOLO configuration, PyTorch models, and Matplotlib cache.
+# Set to local paths (like ".yolo") to keep cache in notebook directory for portability.
+# Set to absolute paths (like "/tmp/yolo") for shared system cache.
+environment:
+  YOLO_CONFIG_DIR: ".yolo" # YOLO configuration and cache directory. Stores model settings and downloaded weights.
+  MPLCONFIGDIR: ".cache/matplotlib" # Matplotlib configuration cache (fonts, figure rendering settings, temporary files).
+  TORCH_HOME: ".cache/torch" # PyTorch cache directory. Stores downloaded model weights and compiled extensions.
+
+# ============================================================================
+# FILE PATHS AND OUTPUTS
+# ============================================================================
+# Paths can be relative (relative to this YAML file location) or absolute.
+# Relative paths recommended for portability across different machines.
+paths:
+  video: "input/20260329_34.mp4" # Input video file. MUST exist before running notebook. Relative or absolute path.
+  weights: "yolo26x-pose.pt" # YOLO26 model weights filename. Will be searched in weights_search_dirs if not in current folder. Common: yolo26n-pose.pt (small), yolo26m-pose.pt (medium), yolo26x-pose.pt (large, best accuracy).
+  weights_search_dirs: # List of directories to search for model weights if not found in current folder. Order matters - searches first directory first.
+    - "../" # Parent directory (test-setup-04-run-density)
+    - "." # Current directory (test-setup-05-evaluate-run-density)
+  output_dir: "output" # Root directory where all outputs will be saved. Created automatically if doesn't exist.
+  annotated_video: "output/20260329_34_yolo26_pose_count.mp4" # Output video with detection boxes, keypoints, person counts, and statistics overlaid. Only created if save_annotated_video: true.
+  frame_counts_csv: "output/frame_counts.csv" # CSV file with per-frame person counts and frame-level statistics. Useful for time-series analysis and graphing.
+  summary_json: "output/summary.json" # JSON file with overall statistics (min/max/average person count, total frames, processing time, throughput, etc.).
+  snapshots_dir: "output/snapshots" # Directory to save snapshot frames at regular intervals. Useful for quality control and debugging. Configure frequency with save_snapshot_every_n_frames.
+
+# ============================================================================
+# RUNTIME SETTINGS (GPU/CPU Configuration)
+# ============================================================================
+# These settings control how the notebook uses your hardware (GPU/CPU).
+# Critical for performance and memory usage optimization.
+runtime:
+  require_cuda: true # If true, notebook fails immediately if CUDA/GPU unavailable. Set false for CPU-only (much slower, ~10x). For RTX 4090: keep true.
+  device: 0 # CUDA device ID. Use 0 for first GPU, 1 for second GPU, etc. Use nvidia-smi to check available devices.
+  batch_size: 32 # Frames processed per GPU batch. RTX 4090 with 24GB VRAM: optimal at 32. RTX 3090: 24-32. RTX 3080: 16-24. RTX 3070: 12-16. Reduce if OutOfMemory errors.
+  auto_reduce_batch_on_oom: true # If true, automatically halves batch size when GPU runs out of memory, retries processing. Keeps notebook running instead of crashing. Recommended: true.
+  empty_cuda_cache_every_batches: 10 # Clear GPU cache every N batches. Prevents memory fragmentation. Set 0 to disable. RTX 4090: 10 (good balance). Low-memory GPUs: 5. Gaming-focused: 20.
+  torch_float32_matmul_precision: "highest" # Matrix multiplication precision. Options: "highest" (best accuracy, slower), "high" (balanced), "medium" (fastest, acceptable for most tasks). Use "highest" for production.
+  allow_tf32: false # Allow TensorFloat32 (faster but reduced precision). Only for NVIDIA A100/H100/newer RTX GPUs with native TF32 support. RTX 4090: keep false (standard precision > speed).
+
+# ============================================================================
+# INFERENCE SETTINGS (YOLO Model Behavior)
+# ============================================================================
+# These settings control how the YOLO model processes frames.
+# Affects speed, accuracy, and number of detections.
+inference:
+  task: "pose" # Model task type. Options: "detect" (bounding boxes only), "pose" (keypoints + boxes), "segment" (instance masks + boxes). Use "pose" for keypoint-based counting.
+  imgsz: 1280 # Input image size (square). Larger = slower but more accurate. RTX 4090: 1280 (recommended). RTX 3090: 1024-1280. RTX 3070: 960-1024. RTX 3060: 640-768.
+  conf: 0.20 # Confidence threshold for detections (0.0-1.0). Lower = more detections but more false positives. Dense crowds: 0.15-0.25. Clear views: 0.3-0.5. Adjust if missing people.
+  iou: 0.70 # IoU (Intersection over Union) threshold for NMS (Non-Maximum Suppression). Lower = fewer overlapping detections. Standard: 0.45-0.70. Dense crowds: 0.50-0.65.
+  max_det: 1000 # Maximum detections per frame. Increase if your crowd exceeds this limit. Typical dense crowds: 300-500. Very dense (concerts, protests): 1000+. Set very high for safety.
+  classes: # List of COCO class IDs to detect. Use [0] for person only. Leave [] or omit for all classes. Common: [0] (person), [0, 1, 2] (person, bicycle, car).
+    - 0 # Class ID 0 = "person" in COCO dataset
+  augment: true # Use test-time augmentation (TTA) for improved accuracy (flip, rotate, scale). Slower (~1.3x). Set false if speed is critical.
+  half: false # Use float16 (half precision) for faster inference with slight accuracy loss. RTX 4090: false (precision > speed). Lower-end GPUs: true if speed needed.
+  verbose: false # Print detailed YOLO logs. Set true for debugging model behavior, false for cleaner output.
+  vid_stride: 1 # Process every Nth frame. Options: 1 (every frame, most accurate), 2 (every 2nd frame, 2x faster), 3 (every 3rd frame, 3x faster). Density analysis: 1. Real-time tracking: 2-3.
+
+# ============================================================================
+# COUNTING SETTINGS (Person Detection and Keypoint Logic)
+# ============================================================================
+# These settings determine HOW people are counted (boxes vs keypoints).
+# Critical for accuracy in different scenarios (aerial, frontal, crowded).
+counting:
+  count_source: "boxes" # Method for counting people. Options: "boxes" (count bounding boxes), "keypoints" (count keypoint clusters), "both" (require both). Aerial/drone: "boxes". Frontal/clear view: "keypoints" or "both".
+  require_keypoints: false # Require keypoints to count a person. If false, count based on boxes alone (better for aerial where people are dots). Aerial: false. Frontal: true. Change if count near zero.
+  min_visible_keypoints: 3 # Minimum visible keypoints to count a person (0-17 for COCO pose model). Zenital/aerial (people as dots): 0-1. Frontal view: 3-5. Lower if missing people from above.
+  min_keypoint_conf: 0.25 # Confidence threshold for individual keypoints (0.0-1.0). Zenital view: 0.0-0.15. Frontal: 0.25-0.50. Lower = count uncertain keypoints. Raise if false positives.
+
+# ============================================================================
+# OUTPUT SETTINGS (Video and File Generation)
+# ============================================================================
+# These settings control what files are generated and their properties.
+# Generate only what you need to save processing time and disk space.
+output:
+  save_annotated_video: true # Save video with detection boxes, keypoints, counts overlaid. Set false to skip video generation (saves ~5-10 minutes per video). Always save for QA/demos.
+  save_frame_counts: true # Save per-frame counts to CSV. Always recommended for analysis, graphing, debugging. Small file size (~1-2 MB).
+  save_summary: true # Save aggregate statistics (min/max/average counts, FPS, processing time) to JSON. Always recommended for reporting and trend analysis.
+  save_snapshot_every_n_frames: 720 # Save frame snapshot every N frames (720 = ~30 sec at 24 fps). Set 0 to disable. Higher = fewer files = less disk space. Use 720-1440 for QA sampling.
+  video_codec: "mp4v" # Codec for output video. Options: "mp4v" (H.264, broad compatibility), "h265" (H.265, better compression). Use "mp4v" for compatibility with all players.
+  progress_every_n_frames: 720 # Print progress update every N frames (720 = ~30 sec at 24 fps). Set 0 to disable. Smaller = more frequent updates. Useful for long videos to track progress.
+  overlay: # Visual overlay settings for annotated video output
+    enabled: true # Enable bounding boxes, keypoints, and count text overlay on video. Set false if you only need CSV/JSON data (faster).
+    font_scale: 0.8 # Font size for text overlay (0.5-2.0). 0.5 = tiny (HD). 0.8 = readable (standard). 1.5 = large (4K or for visibility). Aerial/drone: 0.8-1.0.
+    thickness: 2 # Line thickness for boxes and text (1-5 pixels). 1 = thin (for clean videos). 2 = standard. 3-5 = thick (for crowded scenes or visibility from distance).

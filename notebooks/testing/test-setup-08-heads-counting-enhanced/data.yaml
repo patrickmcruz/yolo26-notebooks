@@ -1,0 +1,68 @@
+# ============================================================================
+# YOLO26 Head Counting - Ultra Performance RTX 4090 Configuration
+# ============================================================================
+app:
+  name: "test-setup-08-heads-counting-enhanced"
+  install_requirements: false
+  requirements_file: "../../requirements.txt"
+  seed: 42
+
+environment:
+  YOLO_CONFIG_DIR: ".yolo"
+  MPLCONFIGDIR: ".cache/matplotlib"
+  TORCH_HOME: ".cache/torch"
+
+paths:
+  video: "input/videos/20260329_34-edited.mp4"
+  images: "input/images/*"
+  # Substitua pelo seu modelo YOLO26 de detecção customizado/pré-treinado para cabeças (ex: CrowdHuman)
+  # Para testes iniciais rápidos, você pode usar o yolo26m.pt ou yolo26x.pt adaptado
+  weights: "yolo26x.pt" 
+  weights_search_dirs:
+    - "../"
+    - "."
+  output_dir: "output"
+  annotated_video: "output/20260329_34-edited_yolo26_head_count.mp4"
+  frame_counts_csv: "output/frame_counts.csv" # Corrigido o typo anterior
+  summary_json: "output/summary.json"
+  snapshots_dir: "output/snapshots"
+
+runtime:
+  require_cuda: true
+  device: 0
+  # RTX 4090 aguenta batch 32 ou 64 tranquilamente para detecção pura em 1280px
+  batch_size: 64 
+  auto_reduce_batch_on_oom: true
+  empty_cuda_cache_every_batches: 0 # Menos fragmentação por não usar Pose
+  torch_float32_matmul_precision: "high" # "high" ou "medium" liberam desempenho massivo na 4090
+  allow_tf32: true # Habilitado para acelerar os núcleos Tensor da 4090 de forma nativa
+
+inference:
+  task: "detect" # Mudado de 'pose' para 'detect' (MUITO mais rápido)
+  imgsz: 1280 # Resolução alta para capturar cabeças distantes e pequenas
+  conf: 0.25 # Threshold seguro para cabeças no escuro (ajuste para 0.18 se perder cabeças à noite)
+  iou: 0.50 # IoU mais baixo para evitar que cabeças muito juntas sejam mescladas no NMS
+  max_det: 1500 # Suporta eventos massivos de altíssima densidade
+  classes:
+    - 0 # Classe correspondente a 'head' no seu dataset customizado
+  augment: false # Desativado no uso real para garantir performance máxima (TTA é lento)
+  half: true # Habilita FP16 nativo (dobra a performance na RTX 4090 sem perda de precisão perceptível)
+  verbose: false
+  vid_stride: 1
+
+counting:
+  count_source: "boxes" # Contagem direta e pura por caixas de detecção
+  require_keypoints: false
+
+output:
+  output_resolution: [1280, 720] # Reducao para acelerar compressao CPU (720p = ~51 FPS, 540p = ~58 FPS, false = 70+ FPS)
+  save_annotated_video: true
+  save_frame_counts: true
+  save_summary: true
+  save_snapshot_every_n_frames: 30 # Amostragem mais inteligente a cada 1 segundo (a 30 FPS)
+  video_codec: "mp4v"
+  progress_every_n_frames: 300
+  overlay:
+    enabled: true
+    font_scale: 0.6 # Fontes menores para não poluir telas com centenas de cabeças
+    thickness: 1 # Linhas mais finas para melhorar a visualização de aglomerados densos

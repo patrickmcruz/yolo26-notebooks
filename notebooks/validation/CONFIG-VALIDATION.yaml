@@ -1,0 +1,177 @@
+################################################################################
+# VALIDATION CONFIGURATION
+# Location: 04-validation/
+# Purpose: Quick sanity checks and end-to-end validation
+################################################################################
+
+category: validation
+description: Quick sanity checks and end-to-end pipeline validation
+directory: 04-validation
+
+# Validation notebook
+notebook: test-quick-validation.ipynb
+
+# Model configuration
+model:
+  primary_path: ../02-training/runs/detect/train/weights/best.pt
+  backup_model: yolo26m.pt
+  supported_formats:
+    - .pt (PyTorch)
+    - .onnx (ONNX)
+    - .tflite (TensorFlow Lite)
+    - .engine (TensorRT)
+
+# Device configuration
+device:
+  preference: auto  # auto-detect GPU/CPU
+  allow_cpu_fallback: true
+  cuda_visible_devices: 0  # use first GPU
+
+# Test image configuration
+test_images:
+  primary:
+    - dog-2.jpeg
+    - dog-3.jpeg
+  fallback_url: https://media.roboflow.com/notebooks/examples/
+  max_test_images: 10
+  download_if_missing: true
+
+# Inference parameters
+inference_params:
+  confidence_threshold: 0.5
+  iou_threshold: 0.45
+  max_detections: 300
+  half_precision: auto  # auto-detect if GPU supports FP16
+
+# Validation checks
+validation_checks:
+  model_loading:
+    required: true
+    timeout_seconds: 30
+    
+  image_loading:
+    required: true
+    format_supported:
+      - jpg
+      - jpeg
+      - png
+      - bmp
+    
+  inference_execution:
+    required: true
+    timeout_seconds: 60
+    
+  output_generation:
+    required: true
+    check_format: true
+    save_images: true
+    
+  quality_checks:
+    confidence_threshold_min: 0.3
+    detection_count_min: 1
+    output_format_valid: true
+
+# Success criteria
+success_criteria:
+  model_loads: true
+  inference_works: true
+  confidence_acceptable: 0.3  # min acceptable confidence
+  fps_minimum: 1  # FPS minimum (CPU) or 20 (GPU)
+  all_outputs_generated: true
+
+# Performance metrics
+performance_metrics:
+  measure_fps: true
+  measure_inference_time: true
+  track_memory_usage: true
+  
+  fps_baselines:
+    cpu: 2
+    gpu_entry_level: 20
+    gpu_mid_range: 45
+    gpu_high_end: 100
+  
+  inference_time_baselines_ms:
+    cpu: 500
+    gpu_entry_level: 50
+    gpu_mid_range: 25
+    gpu_high_end: 10
+
+# Dependencies
+dependencies:
+  core:
+    - ultralytics>=8.4.0
+    - torch>=2.0.0
+    - torchvision>=0.15.0
+    
+  utilities:
+    - numpy
+    - opencv-python
+    - Pillow
+    - tqdm
+
+# Hardware requirements
+hardware_requirements:
+  cpu_cores_min: 1
+  ram_gb_min: 4
+  
+  gpu:
+    required: false  # CPU capable
+    vram_gb_min: 2
+    vram_gb_recommended: 4
+    
+  storage_gb_required: 5
+
+# Estimated runtime
+estimated_runtime_minutes: 1
+
+# Output configuration
+outputs:
+  save_directory: runs/detect/predict/
+  save_annotated_images: true
+  generate_summary_report: true
+  export_metrics_json: true
+  
+  expected_files:
+    - annotated_images.jpg (2+)
+    - results.txt
+    - detection_summary.json
+    - inference_metrics.json
+
+# Integration settings
+ci_cd_integration:
+  enabled: true
+  fail_on_error: true
+  generate_report: true
+  
+  github_actions_support: true
+  gitlab_ci_support: true
+  jenkins_support: true
+
+# Logging configuration
+logging:
+  verbose: true
+  log_level: INFO  # DEBUG, INFO, WARNING, ERROR
+  save_logs: false
+  
+# Troubleshooting configuration
+troubleshooting:
+  model_not_found:
+    auto_download: true
+    download_timeout: 300
+    
+  import_errors:
+    install_missing_packages: false
+    suggest_installation_command: true
+    
+  inference_errors:
+    retry_count: 1
+    fallback_to_cpu: true
+
+# Model card template (generated after validation)
+model_card:
+  generate: true
+  include_metrics: true
+  include_timestamp: true
+  include_hardware_info: true
+  include_usage_instructions: true

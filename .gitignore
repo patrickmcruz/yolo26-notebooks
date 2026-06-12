@@ -1,38 +1,109 @@
+# IDE
 .idea/
 .vscode/
 
+# Python environments
 env/
 venv/
 .venv/
+ENV/
+env.bak/
+venv.bak/
 
+# OS
 .DS_Store
-.ipynb_checkpoints
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-## all notebooks
-notebooks/.env
-notebooks/datasets/
-notebooks/_v/
-notebooks/results/
-notebooks/yolo26m.pt
-notebooks/yolo26n.pt
-notebooks/yolo26x.pt
+# Jupyter
+.ipynb_checkpoints/
+.jupyter/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
 
-## notebook test-setup-02-train-hparams
-notebooks/test-setup-02-train-hparams/_v/
-notebooks/test-setup-02-train-hparams/datasets/
-notebooks/test-setup-02-train-hparams/results/
-notebooks/test-setup-02-train-hparams/runs/
+# Python
+*.py[cod]
+*$py.class
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-## notebook test-setup-03-run-few
-notebooks/test-setup-03-run-few/input
-notebooks/test-setup-03-run-few/yolo26x-pose.pt
-notebooks/test-setup-03-run-few/.cache/
-notebooks/test-setup-03-run-few/.yolo/
-notebooks/test-setup-03-run-few/output/
+# Environment
+.env
+.env.local
+# Pre-trained models (ignore all large weights globally, allow small models under notebooks/models/)
+**/*.pt
+**/*.engine
+**/*.onnx
+!notebooks/models/yolo26m.pt
+!notebooks/models/yolo26n.pt
 
-## notebook test-setup-04-run-density
-notebooks/test-setup-04-run-density/input
-notebooks/test-setup-04-run-density/yolo26x-pose.pt
-notebooks/test-setup-04-run-density/.cache/
-notebooks/test-setup-04-run-density/.yolo/
-notebooks/test-setup-04-run-density/output/
+# Dataset directories (do not commit large datasets)
+**/datasets/
+
+# Input and Output directories (do not commit raw video data or generated outputs)
+**/input/
+**/output/
+
+# Training, testing, and validation artifacts
+**/runs/
+**/results/
+**/mlruns/
+**/_v/
+**/.cache/
+**/.yolo/
+
+# Temporary files and logs
+*.tmp
+*.swp
+*.swo
+*~
+.~*
+*.log
+logs/
+*.log.*
+
+# MLflow artifacts
+mlruns/
+.mlflow/
+mlflow.db
+
+# Cache directories
+.cache/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+
+# Temporary directories
+tmp/
+temp/
+temp_*
+
+# VS Code workspace settings
+.vscode/settings.json
+.vscode/launch.json
+
+# IDE project files
+*.sublime-project
+*.sublime-workspace
+

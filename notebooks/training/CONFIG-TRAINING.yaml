@@ -1,0 +1,194 @@
+################################################################################
+# TRAINING CONFIGURATION
+# Location: 02-training/
+# Purpose: Model training workflows
+################################################################################
+
+category: training
+description: Model training workflows
+directory: 02-training
+
+# Notebooks in this category
+notebooks:
+  - _train-template.ipynb
+  - train-yolo26-object-detection-on-custom-dataset.ipynb
+  - train-yolo26-instance-segmentation-on-custom-dataset.ipynb
+  - how-to-finetune-rf-detr-on-segmentation-dataset-a100.ipynb
+
+# Dependencies
+dependencies:
+  core:
+    - ultralytics>=8.4.0
+    - torch>=2.0.0
+    - torchvision>=0.15.0
+    - supervision
+    - roboflow
+    
+  training:
+    - numpy
+    - pandas
+    - opencv-python
+    - scikit-learn
+    - tqdm
+    - pyyaml
+    
+  visualization:
+    - matplotlib
+    - seaborn
+    - Pillow
+
+# Hardware requirements
+hardware_requirements:
+  cpu_cores_min: 4
+  ram_gb_min: 16
+  
+  gpu:
+    required: true
+    vram_gb_min: 8
+    vram_gb_recommended: 16
+    vram_gb_high_end: 24+
+    
+  storage_gb_required: 50
+
+# Training hyperparameters for each task
+training_configs:
+  object_detection:
+    batch_size: 16
+    image_size: 960
+    epochs: 50
+    learning_rate: 0.001
+    optimizer: SGD
+    momentum: 0.937
+    weight_decay: 0.0005
+    warmup_epochs: 3
+    patience: 20  # early stopping
+    
+  instance_segmentation:
+    batch_size: 8
+    image_size: 960
+    epochs: 75
+    learning_rate: 0.001
+    optimizer: SGD
+    momentum: 0.937
+    weight_decay: 0.0005
+    warmup_epochs: 3
+    patience: 25
+    mask_alpha: 0.3  # mask weight in loss
+    
+  detr_finetuning:
+    batch_size: 4
+    image_size: 1024
+    epochs: 30
+    learning_rate: 0.00001
+    optimizer: AdamW
+    weight_decay: 0.0001
+    warmup_epochs: 2
+    gradient_accumulation: 2
+
+# Data augmentation strategies
+augmentation:
+  light:
+    mosaic: 1.0
+    mixup: 0.1
+    flipud: 0.5
+    fliplr: 0.5
+    
+  medium:
+    mosaic: 1.0
+    mixup: 0.3
+    flipud: 0.5
+    fliplr: 0.5
+    perspective: 0.0
+    
+  heavy:
+    mosaic: 1.0
+    mixup: 0.5
+    flipud: 0.5
+    fliplr: 0.5
+    perspective: 0.001
+    scale: 0.5
+    brightness: 0.2
+    saturation: 0.7
+
+# Estimated runtimes
+estimated_runtime_minutes:
+  object_detection: 60
+  instance_segmentation: 90
+  detr_finetuning: 120
+
+# Expected outputs
+expected_outputs:
+  - runs/detect/train*/weights/best.pt
+  - runs/detect/train*/weights/last.pt
+  - runs/detect/train*/results.csv
+  - runs/detect/train*/confusion_matrix.png
+  - runs/detect/train*/F1_curve.png
+  - runs/detect/train*/P_curve.png
+  - runs/detect/train*/PR_curve.png
+  - runs/detect/train*/R_curve.png
+
+# Model variants available
+model_variants:
+  nano:
+    name: yolo26n
+    size_mb: 3.5
+    parameters: 250k
+    inference_speed_ms: 3
+    map50: 27.3
+    
+  small:
+    name: yolo26s
+    size_mb: 12.6
+    parameters: 3.2m
+    inference_speed_ms: 6
+    map50: 40.7
+    
+  medium:
+    name: yolo26m
+    size_mb: 25.4
+    parameters: 6.2m
+    inference_speed_ms: 11
+    map50: 47.4
+    
+  large:
+    name: yolo26l
+    size_mb: 52.9
+    parameters: 12.5m
+    inference_speed_ms: 21
+    map50: 50.3
+    
+  extra_large:
+    name: yolo26x
+    size_mb: 97.8
+    parameters: 22.1m
+    inference_speed_ms: 33
+    map50: 50.9
+
+# Dataset preparation requirements
+dataset_requirements:
+  format: YOLO
+  structure:
+    - images/train
+    - images/val
+    - images/test
+    - labels/train
+    - labels/val
+    - labels/test
+  label_format: |-
+    YOLO txt format:
+    <class_id> <x_center> <y_center> <width> <height>
+    (normalized to 0-1)
+
+# Monitoring and checkpointing
+checkpointing:
+  save_frequency: 10  # save every N epochs
+  keep_best: true
+  keep_last: true
+  early_stopping: true
+  patience: 20
+
+# Tensorboard/Wandb logging (optional)
+logging:
+  tensorboard: true
+  wandb: false
+  log_directory: runs/

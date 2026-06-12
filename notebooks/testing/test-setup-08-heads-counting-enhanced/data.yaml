@@ -30,23 +30,23 @@ paths:
 runtime:
   require_cuda: true
   device: 0
-  # RTX 4090 aguenta batch 32 ou 64 tranquilamente para detecção pura em 1280px
-  batch_size: 64 
+  # Batch menor ajuda a evitar estouro de memoria ao rodar em resolucoes gigantes com augment=true
+  batch_size: 16 
   auto_reduce_batch_on_oom: true
-  empty_cuda_cache_every_batches: 0 # Menos fragmentação por não usar Pose
-  torch_float32_matmul_precision: "high" # "high" ou "medium" liberam desempenho massivo na 4090
-  allow_tf32: true # Habilitado para acelerar os núcleos Tensor da 4090 de forma nativa
+  empty_cuda_cache_every_batches: 0
+  torch_float32_matmul_precision: "highest" # Forca a precisao maxima do PyTorch para calculos matriciais
+  allow_tf32: true
 
 inference:
-  task: "detect" # Mudado de 'pose' para 'detect' (MUITO mais rápido)
-  imgsz: 1280 # Resolução alta para capturar cabeças distantes e pequenas
-  conf: 0.25 # Threshold seguro para cabeças no escuro (ajuste para 0.18 se perder cabeças à noite)
-  iou: 0.50 # IoU mais baixo para evitar que cabeças muito juntas sejam mescladas no NMS
-  max_det: 1500 # Suporta eventos massivos de altíssima densidade
+  task: "detect"
+  imgsz: 1920 # Aumentado para detectar cabecas pequenas e distantes
+  conf: 0.18  # Reduzido para capturar deteccoes menos evidentes/no escuro
+  iou: 0.65   # Aumentado para nao suprimir cabecas proximas em multidoes
+  max_det: 2000 # Elevado para suportar maior volume de deteccoes simultaneas
   classes:
-    - 0 # Classe correspondente a 'head' no seu dataset customizado
-  augment: false # Desativado no uso real para garantir performance máxima (TTA é lento)
-  half: true # Habilita FP16 nativo (dobra a performance na RTX 4090 sem perda de precisão perceptível)
+    - 0
+  augment: false # Desativado pois o modelo/formato nao suporta TTA
+  half: false   # Desativa FP16 para obter precisao de Float32 completo
   verbose: false
   vid_stride: 1
 

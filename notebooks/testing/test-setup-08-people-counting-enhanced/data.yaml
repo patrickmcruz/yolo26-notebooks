@@ -22,7 +22,7 @@ paths:
     - "../"
     - "."
   output_dir: "output"
-  annotated_video: "output/20260329_34-edited_yolo26_head_count.mp4"
+  annotated_video: "output/20260329_34-edited_yolo26_people_count.mp4"
   frame_counts_csv: "output/frame_counts.csv" # Corrigido o typo anterior
   summary_json: "output/summary.json"
   snapshots_dir: "output/snapshots"

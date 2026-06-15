@@ -115,7 +115,6 @@ class CountingPipeline:
         # 4. Initialize multithreaded readers
         vid_stride = self.config.inference.vid_stride
         batch_size = self.config.runtime.batch_size
-        progress_every = self.config.output.progress_every_n_frames
 
         logger.info(f"Opening video file: {self.config.paths.video}")
         with VideoReader(self.config.paths.video, stride=vid_stride) as reader:
@@ -123,63 +122,60 @@ class CountingPipeline:
             logger.info(f"Video metadata extracted: {json.dumps(self.video_meta)}")
 
             expected_processed = (self.video_meta["frame_count"] + vid_stride - 1) // vid_stride
-            next_progress = progress_every
 
-            # 5. Initialize multithreaded writers
-            with VideoWriterWrapper(self.config, self.video_meta) as writer:
-                # 6. Setup CSV writer if enabled
-                csv_file = None
-                csv_writer = None
-                if self.config.output.save_frame_counts:
-                    csv_path = Path(self.config.paths.frame_counts_csv)
-                    csv_path.parent.mkdir(parents=True, exist_ok=True)
-                    csv_file = csv_path.open("w", newline="", encoding="utf-8")
-                    csv_writer = csv.DictWriter(
-                        csv_file, fieldnames=["frame_index", "timestamp_sec", "people_count"]
-                    )
-                    csv_writer.writeheader()
+            from tqdm.auto import tqdm
+            start_time = time.time()
 
-                start_time = time.time()
-                batch_frames = []
-                batch_indices = []
-                processed_frames = 0
+            # Create progress bar
+            with tqdm(total=expected_processed, desc="Processing Video", unit="frame") as pbar:
+                self.pbar = pbar
 
-                try:
-                    for frame, frame_idx in reader.iter_frames():
-                        batch_frames.append(frame)
-                        batch_indices.append(frame_idx)
+                # 5. Initialize multithreaded writers
+                with VideoWriterWrapper(self.config, self.video_meta) as writer:
+                    # 6. Setup CSV writer if enabled
+                    csv_file = None
+                    csv_writer = None
+                    if self.config.output.save_frame_counts:
+                        csv_path = Path(self.config.paths.frame_counts_csv)
+                        csv_path.parent.mkdir(parents=True, exist_ok=True)
+                        csv_file = csv_path.open("w", newline="", encoding="utf-8")
+                        csv_writer = csv.DictWriter(
+                            csv_file, fieldnames=["frame_index", "timestamp_sec", "people_count"]
+                        )
+                        csv_writer.writeheader()
 
-                        if len(batch_frames) >= batch_size:
-                            processed_frames = self._process_and_write_batch(
+                    batch_frames = []
+                    batch_indices = []
+
+                    try:
+                        for frame, frame_idx in reader.iter_frames():
+                            batch_frames.append(frame)
+                            batch_indices.append(frame_idx)
+
+                            if len(batch_frames) >= batch_size:
+                                self._process_and_write_batch(
+                                    batch_frames,
+                                    batch_indices,
+                                    writer,
+                                    csv_writer,
+                                )
+
+                        # Process remaining frames
+                        if batch_frames:
+                            self._process_and_write_batch(
                                 batch_frames,
                                 batch_indices,
                                 writer,
                                 csv_writer,
-                                processed_frames,
-                                expected_processed,
-                                start_time,
-                                next_progress,
-                                progress_every,
                             )
-                            next_progress = ((processed_frames // progress_every) + 1) * progress_every
 
-                    # Process remaining frames
-                    if batch_frames:
-                        self._process_and_write_batch(
-                            batch_frames,
-                            batch_indices,
-                            writer,
-                            csv_writer,
-                            processed_frames,
-                            expected_processed,
-                            start_time,
-                            next_progress,
-                            progress_every,
-                        )
+                        # Set progress bar total to actual decodable frames on successful completion
+                        pbar.total = len(self.counts)
+                        pbar.refresh()
 
-                finally:
-                    if csv_file is not None:
-                        csv_file.close()
+                    finally:
+                        if csv_file is not None:
+                            csv_file.close()
 
                 elapsed_sec = time.time() - start_time
                 self.summary = self._build_summary(elapsed_sec, len(self.counts))
@@ -191,7 +187,7 @@ class CountingPipeline:
                     with summary_path.open("w", encoding="utf-8") as f:
                         json.dump(self.summary, f, indent=2)
 
-                print("=" * 60)
+                print("\n" + "=" * 60)
                 print("PROCESSAMENTO FINALIZADO!")
                 print(f"Média final: {self.summary['fps_processed']} FPS")
                 print("=" * 60)
@@ -204,12 +200,7 @@ class CountingPipeline:
         batch_indices: list[int],
         writer: VideoWriterWrapper,
         csv_writer: Any | None,
-        processed_frames: int,
-        expected_processed: int,
-        start_time: float,
-        next_progress: int,
-        progress_every: int,
-    ) -> int:
+    ) -> None:
         """Runs batch inference, collects statistics, and enqueues frames to writing threads."""
         frames = list(batch_frames)
         indices = list(batch_indices)
@@ -240,19 +231,10 @@ class CountingPipeline:
 
             # Enqueue task for background annotation and writing
             writer.write_result(result, count, frame_idx, timestamp_sec)
-            processed_frames += 1
 
-        # Periodic status logging
-        if processed_frames >= next_progress:
-            elapsed = time.time() - start_time
-            rate = processed_frames / elapsed if elapsed > 0 else 0.0
-            remaining = (expected_processed - processed_frames) / rate if rate > 0 else 0.0
-            print(
-                f"Processados {processed_frames}/{expected_processed} frames "
-                f"({rate:0.2f} FPS) | ETA: {format_seconds(remaining)}"
-            )
-
-        return processed_frames
+        # Update tqdm progress bar
+        if hasattr(self, "pbar") and self.pbar is not None:
+            self.pbar.update(len(results))
 
 
 def run_pipeline(config_path: Path | str) -> dict[str, Any]:

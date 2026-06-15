@@ -1,3 +1,13 @@
+"""
+Pipeline Orchestration Module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This module acts as the core coordinator for the head counting pipeline. It sets up
+environment variables, initializes model handlers and video streams, runs the main
+prediction-aggregation loop, writes output reports (CSV, JSON), and ensures graceful
+resource cleanup upon termination or exceptions.
+"""
+
 from __future__ import annotations
 import csv
 import json
@@ -18,16 +28,36 @@ logger = logging.getLogger(__name__)
 
 
 def format_seconds(seconds: float) -> str:
-    """Formats a duration in seconds into HH:MM:SS format."""
+    """Formats a duration in seconds into HH:MM:SS format.
+
+    Args:
+        seconds: Elapsed time in seconds.
+
+    Returns:
+        A formatted string (e.g. '00:02:15').
+    """
     m, s = divmod(int(seconds), 60)
     h, m = divmod(m, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 class CountingPipeline:
-    """Orchestrates the environment setup, model execution, video multithreading, and output report generation."""
+    """Orchestrates environment setup, model execution, video multithreading, and report exports.
+
+    Attributes:
+        config: Loaded system PipelineConfig configuration.
+        model_handler: Handler managing the YOLO model lifecycle and predictions.
+        counts: List of integers storing head count history frame-by-frame.
+        video_meta: Cached metadata profile of the active video stream.
+        summary: Result summaries compiled at the end of the run.
+    """
 
     def __init__(self, config: PipelineConfig):
+        """Initializes the pipeline runner.
+
+        Args:
+            config: A PipelineConfig instance.
+        """
         self.config = config
         self.model_handler = YOLOModelHandler(config)
         self.counts: list[int] = []
@@ -35,7 +65,11 @@ class CountingPipeline:
         self.summary: dict[str, Any] = {}
 
     def _apply_environment(self) -> None:
-        """Applies configured environment variables, ensuring directory paths exist."""
+        """Applies configured environment variables, ensuring directory paths exist.
+
+        Sets up paths for YOLO, Matplotlib, and PyTorch home cache folders.
+        Also configures random seeds for Python, NumPy, and PyTorch.
+        """
         env_vars = {
             "YOLO_CONFIG_DIR": self.config.environment.yolo_config_dir,
             "MPLCONFIGDIR": self.config.environment.mpl_config_dir,
@@ -59,7 +93,18 @@ class CountingPipeline:
         logger.info(f"Random seed initialized to: {seed}")
 
     def _build_summary(self, elapsed_sec: float, processed_frames: int) -> dict[str, Any]:
-        """Compiles population statistics and execution metrics into a dictionary summary."""
+        """Compiles population statistics and execution metrics into a dictionary summary.
+
+        Calculates min, max, average, median, and 95th percentile metrics for crowd
+        sizes, alongside execution throughput speeds (FPS).
+
+        Args:
+            elapsed_sec: Processing time in seconds.
+            processed_frames: Total count of frames successfully evaluated.
+
+        Returns:
+            A dictionary containing consolidated analytics summary metrics.
+        """
         if self.counts:
             p95 = float(np.percentile(np.asarray(self.counts), 95))
             summary_counts = {
@@ -98,7 +143,14 @@ class CountingPipeline:
         }
 
     def run(self) -> dict[str, Any]:
-        """Main execution flow coordinating readers, batch processors, and writers."""
+        """Main execution flow coordinating readers, batch processors, and writers.
+
+        Manages context lifecycles for VideoReader and VideoWriter, handles
+        batch assembly, triggers model evaluations, and writes output files.
+
+        Returns:
+            A dictionary containing consolidated analytics summary metrics.
+        """
         # 1. Apply environment configuration and seed
         self._apply_environment()
 
@@ -201,7 +253,14 @@ class CountingPipeline:
         writer: VideoWriterWrapper,
         csv_writer: Any | None,
     ) -> None:
-        """Runs batch inference, collects statistics, and enqueues frames to writing threads."""
+        """Runs batch inference, collects statistics, and enqueues frames to writing threads.
+
+        Args:
+            batch_frames: Frames representing the active chunk batch.
+            batch_indices: Frame index list for references.
+            writer: Background VideoWriterWrapper queue handler.
+            csv_writer: CSV writer interface for saving count statistics.
+        """
         frames = list(batch_frames)
         indices = list(batch_indices)
         batch_frames.clear()
@@ -238,7 +297,14 @@ class CountingPipeline:
 
 
 def run_pipeline(config_path: Path | str) -> dict[str, Any]:
-    """Helper entrypoint to easily load config and execute the pipeline."""
+    """Helper entrypoint to easily load config and execute the pipeline.
+
+    Args:
+        config_path: Path pointing to the target YAML config file.
+
+    Returns:
+        A dictionary containing consolidated analytics summary metrics.
+    """
     config = PipelineConfig.from_yaml(config_path)
     pipeline = CountingPipeline(config)
     return pipeline.run()

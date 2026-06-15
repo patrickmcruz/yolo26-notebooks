@@ -1,3 +1,12 @@
+"""
+YOLO Model Management Module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This module manages the instantiation, hardware allocation, precision modes, and
+inference operations for the YOLO model. It includes adaptive logic to handle CUDA
+Out-of-Memory (OOM) errors by recursively reducing the batch size during runtime.
+"""
+
 from __future__ import annotations
 import json
 import logging
@@ -13,9 +22,23 @@ logger = logging.getLogger(__name__)
 
 
 class YOLOModelHandler:
-    """Handles the lifecycle, setup, and inference operations for the YOLO model on GPU/CPU."""
+    """Manages the YOLO model instance, configures hardware settings, and executes batch predictions.
+
+    Attributes:
+        config: The parsed system PipelineConfig instance.
+        device: CUDA device index or identifier.
+        require_cuda: If True, blocks CPU fallback if GPU fails.
+        weights_ref: Resolved path to the local model weights file.
+        model: Loaded YOLO model instance.
+        predict_args: Inference parameter dictionary passed to YOLO's predict method.
+    """
 
     def __init__(self, config: PipelineConfig):
+        """Initializes the model handler using a system config.
+
+        Args:
+            config: A PipelineConfig instance.
+        """
         self.config = config
         self.device = config.runtime.device
         self.require_cuda = config.runtime.require_cuda
@@ -24,7 +47,15 @@ class YOLOModelHandler:
         self.predict_args: dict[str, Any] = {}
 
     def _resolve_weight_reference(self) -> str:
-        """Resolves the location of model weights, prioritizing local TensorRT (.engine) formats."""
+        """Resolves the location of model weights, prioritizing local TensorRT (.engine) formats.
+
+        Iterates through the local weight paths and directories specified in config
+        to locate precompiled engines. If none are found, falls back to .pt files or
+        notifies YOLO to download.
+
+        Returns:
+            An absolute path string of the resolved weights file, or raw weight reference.
+        """
         weight_ref = self.config.paths.weights
         weight_path = Path(weight_ref)
 
@@ -66,7 +97,14 @@ class YOLOModelHandler:
         return weight_ref
 
     def setup_runtime(self) -> None:
-        """Configures OpenCV settings, PyTorch backends, and CUDA optimization flags."""
+        """Configures OpenCV settings, PyTorch backends, and CUDA optimization flags.
+
+        Activates/deactivates TensorFloat32 (TF32) kernels, benchmarking, and matmul
+        precision modes based on the loaded configuration.
+
+        Raises:
+            RuntimeError: If require_cuda is True but CUDA is unavailable.
+        """
         # Disable synchronous YOLO settings to boost batch inference throughput
         try:
             from ultralytics.utils import SETTINGS
@@ -97,7 +135,13 @@ class YOLOModelHandler:
             logger.info(f"CUDA initialized on device {self.device} successfully.")
 
     def load_model(self) -> None:
-        """Instantiates the YOLO model and transfers weights to GPU."""
+        """Instantiates the YOLO model and transfers weights to target GPU/CPU hardware.
+
+        Sets up the prediction arguments dict used during inference.
+
+        Raises:
+            RuntimeError: If the YOLO architecture task (e.g. pose) mismatches config task.
+        """
         expected_task = self.config.inference.task
         
         # Load YOLO
@@ -137,7 +181,20 @@ class YOLOModelHandler:
         logger.info(f"Model predict arguments: {json.dumps(self.predict_args, default=str)}")
 
     def predict_batch(self, frames: list[np.ndarray]) -> list[Any]:
-        """Runs batch inference on the list of frames. Handles CUDA Out-Of-Memory gracefully."""
+        """Runs batch inference on the list of frames. Handles CUDA Out-Of-Memory gracefully.
+
+        If a CUDA Out-Of-Memory (OOM) error occurs and auto_reduce_batch_on_oom is True,
+        recursively splits the batch into two halves and attempts to process again.
+
+        Args:
+            frames: A list of NumPy arrays representing video frames.
+
+        Returns:
+            A list of YOLO Result objects containing bounding boxes and confidences.
+
+        Raises:
+            RuntimeError: If OOM is triggered and cannot be resolved by halving batch size.
+        """
         if not frames:
             return []
         

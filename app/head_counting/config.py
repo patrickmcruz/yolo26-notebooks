@@ -1,3 +1,12 @@
+"""
+Configuration Module
+~~~~~~~~~~~~~~~~~~~~
+
+This module provides dataclass schemas and parsing methods to load, validate, and
+resolve system paths for the head counting pipeline. Path parameters are dynamically
+resolved relative to the directory containing the active YAML configuration file.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -7,12 +16,25 @@ import yaml
 
 @dataclass
 class AppConfig:
+    """General application metadata configurations.
+
+    Attributes:
+        name: Name of the application setup for logs and reports.
+        seed: Random seed for reproducibility in sampling and shuffling operations.
+    """
     name: str = "head-counting-pipeline"
     seed: int = 42
 
 
 @dataclass
 class EnvConfig:
+    """Local cache and configuration folders for machine learning libraries.
+
+    Attributes:
+        yolo_config_dir: Directory where YOLO keeps local parameters.
+        mpl_config_dir: Cache folder for Matplotlib parameters.
+        torch_home: Directory where PyTorch downloads pre-trained weights.
+    """
     yolo_config_dir: str = ".yolo"
     mpl_config_dir: str = ".cache/matplotlib"
     torch_home: str = ".cache/torch"
@@ -20,6 +42,19 @@ class EnvConfig:
 
 @dataclass
 class PathsConfig:
+    """Input and output asset file paths. Relative paths are resolved to absolute.
+
+    Attributes:
+        video: Path to the input MP4/AVI video file.
+        images: Glob pattern for input images (if applicable).
+        weights: Path to the local YOLO model weights (.pt or .engine).
+        weights_search_dirs: Directory paths searched in order to locate model weights.
+        output_dir: Main folder where output files are created.
+        annotated_video: Target path for the output annotated MP4 video.
+        frame_counts_csv: Target path for the frame-by-frame counts CSV table.
+        summary_json: Target path for the final executive summary JSON report.
+        snapshots_dir: Directory where JPEG snapshots of selected frames are stored.
+    """
     video: str = ""
     images: str = ""
     weights: str = "yolo26x.pt"
@@ -33,6 +68,17 @@ class PathsConfig:
 
 @dataclass
 class RuntimeConfig:
+    """PyTorch device routing, multi-threading, and VRAM options.
+
+    Attributes:
+        require_cuda: If True, halts execution if CUDA is unavailable.
+        device: CUDA device ID (e.g. 0 for GPU 0).
+        batch_size: Number of frames processed in a single YOLO batch.
+        auto_reduce_batch_on_oom: Halves batch size on CUDA Out-of-Memory.
+        empty_cuda_cache_every_batches: Cache cleanup interval (0 to disable).
+        torch_float32_matmul_precision: Precision level for PyTorch matrix operations.
+        allow_tf32: Enables TensorFloat32 math kernels on Ampere+ GPUs (RTX 4090).
+    """
     require_cuda: bool = True
     device: int = 0
     batch_size: int = 16
@@ -44,6 +90,20 @@ class RuntimeConfig:
 
 @dataclass
 class InferenceConfig:
+    """YOLO model task and confidence thresholds for object detection.
+
+    Attributes:
+        task: YOLO pipeline task (typically 'detect' for bounding boxes).
+        imgsz: Resolution of frames fed into the network (e.g. 1920).
+        conf: Confidence threshold limit; objects below this are discarded.
+        iou: Intersection-Over-Union threshold for Non-Maximum Suppression (NMS).
+        max_det: Maximum detections kept per frame.
+        classes: List of integer class IDs to detect (0 corresponds to person/head).
+        augment: Enables Test-Time Augmentation (TTA).
+        half: Runs network inference in FP16 precision.
+        verbose: Prints batch prediction details.
+        vid_stride: Evaluates every N-th frame of the video.
+    """
     task: str = "detect"
     imgsz: int = 1920
     conf: float = 0.18
@@ -58,12 +118,25 @@ class InferenceConfig:
 
 @dataclass
 class CountingConfig:
+    """Target output detection features for people counts.
+
+    Attributes:
+        count_source: Source for counts ('boxes' or 'keypoints').
+        require_keypoints: Requires pose checkpoints for counts validation.
+    """
     count_source: str = "boxes"
     require_keypoints: bool = False
 
 
 @dataclass
 class OverlayConfig:
+    """Visual style settings for annotations drawn on the output video.
+
+    Attributes:
+        enabled: If True, draws annotations on frames.
+        font_scale: Font scale multiplier for rendered text.
+        thickness: Bounding box line thickness and text weight.
+    """
     enabled: bool = True
     font_scale: float = 0.6
     thickness: int = 1
@@ -71,6 +144,18 @@ class OverlayConfig:
 
 @dataclass
 class OutputConfig:
+    """Report and export specifications.
+
+    Attributes:
+        output_resolution: Resizes video frames to [width, height] before compression.
+        save_annotated_video: Enables saving of the output MP4 video.
+        save_frame_counts: Enables saving of the CSV frame records.
+        save_summary: Enables saving of the JSON report summary.
+        save_snapshot_every_n_frames: Interval to save JPEG audit snapshots (0 to disable).
+        video_codec: OpenCV fourcc codec string (e.g. 'mp4v').
+        progress_every_n_frames: Console logging interval.
+        overlay: Aesthetic overlay properties.
+    """
     output_resolution: list[int] | None = None
     save_annotated_video: bool = True
     save_frame_counts: bool = True
@@ -83,6 +168,7 @@ class OutputConfig:
 
 @dataclass
 class PipelineConfig:
+    """Aggregates all system configurations into a single type-safe interface."""
     app: AppConfig = field(default_factory=AppConfig)
     environment: EnvConfig = field(default_factory=EnvConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
@@ -91,12 +177,22 @@ class PipelineConfig:
     counting: CountingConfig = field(default_factory=CountingConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
 
-    # Stores the directory of the config file to resolve relative paths
+    # Config folder directory (used to resolve relative paths)
     config_dir: Path = field(default_factory=lambda: Path.cwd())
 
     @classmethod
     def from_yaml(cls, yaml_path: Path | str) -> PipelineConfig:
-        """Loads configuration from a YAML file and resolves relative paths."""
+        """Loads configuration from a YAML file, parses and checks fields, and resolves paths.
+
+        Args:
+            yaml_path: Absolute or relative path to the target YAML file.
+
+        Returns:
+            A validated PipelineConfig instance with absolute path settings.
+
+        Raises:
+            FileNotFoundError: If the YAML file does not exist.
+        """
         yaml_path = Path(yaml_path).resolve()
         if not yaml_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {yaml_path}")
@@ -203,7 +299,7 @@ class PipelineConfig:
         return config
 
     def _resolve_paths(self) -> None:
-        """Resolves relative path parameters to absolute paths relative to the config file location."""
+        """Resolves raw relative paths in settings into absolute paths relative to the config file's parent folder."""
         
         def to_absolute(val: str) -> str:
             if not val:

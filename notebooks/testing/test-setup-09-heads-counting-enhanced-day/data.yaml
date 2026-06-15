@@ -2,7 +2,7 @@
 # YOLO26 Head Counting - Ultra Performance RTX 4090 Configuration
 # ============================================================================
 app:
-  name: "test-setup-09-heads-counting-enhanced"
+  name: "test-setup-09-heads-counting-enhanced-day"
   install_requirements: false
   requirements_file: "../../requirements.txt"
   seed: 42

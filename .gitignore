@@ -10,6 +10,12 @@ ENV/
 env.bak/
 venv.bak/
 
+# App ignore
+/app/.venv/
+/app/.pytest_cache/
+/app/input/videos/
+/app/output/
+
 # OS
 .DS_Store
 .DS_Store?

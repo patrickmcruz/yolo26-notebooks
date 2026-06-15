@@ -1,0 +1,65 @@
+# ============================================================================
+# YOLO26 Head Counting - Isolated Day Configuration
+# ============================================================================
+app:
+  name: "test-setup-11-heads-counting-enhanced-day"
+  install_requirements: false
+  requirements_file: "requirements.txt"
+  seed: 42
+
+environment:
+  YOLO_CONFIG_DIR: ".yolo"
+  MPLCONFIGDIR: ".cache/matplotlib"
+  TORCH_HOME: ".cache/torch"
+
+paths:
+  video: "input/videos/muralha-dia.mp4"
+  images: "input/images/*"
+  weights: "weights/best.pt"
+  weights_search_dirs:
+    - "weights"
+    - "."
+  output_dir: "output/day"
+  annotated_video: "output/day/muralha-dia_yolo26_head_count_crowdhuman.mp4"
+  frame_counts_csv: "output/day/frame_counts.csv"
+  summary_json: "output/day/summary.json"
+  snapshots_dir: "output/day/snapshots"
+
+runtime:
+  require_cuda: true
+  device: 0
+  batch_size: 16
+  auto_reduce_batch_on_oom: true
+  empty_cuda_cache_every_batches: 0
+  torch_float32_matmul_precision: "highest"
+  allow_tf32: true
+
+inference:
+  task: "detect"
+  imgsz: 1920
+  conf: 0.18
+  iou: 0.65
+  max_det: 2000
+  classes:
+    - 0
+  augment: false
+  half: false
+  verbose: false
+  vid_stride: 1
+
+counting:
+  count_source: "boxes"
+  require_keypoints: false
+
+output:
+  output_resolution: [1280, 720]
+  save_annotated_video: true
+  save_frame_counts: true
+  save_summary: true
+  save_snapshot_every_n_frames: 30
+  video_codec: "mp4v"
+  progress_every_n_frames: 300
+  overlay:
+    enabled: true
+    font_scale: 0.6
+    thickness: 1

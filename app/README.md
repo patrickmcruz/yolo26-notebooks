@@ -6,6 +6,16 @@ Seguindo as novas especificações, esta aplicação **não possui dependências
 
 ---
 
+## 📚 Referências e Créditos de Modelos
+
+Os pesos utilizados neste subprojeto (`best.pt` / `best.engine`) baseiam-se em modelos pré-treinados e disponibilizados publicamente pela comunidade de código aberto:
+
+* **Modelo Original**: [irail-crowd-counting-yolov8n](https://huggingface.co/AmineSam/irail-crowd-counting-yolov8n)
+* **Autor/Mantenedor**: [AmineSam (HuggingFace)](https://huggingface.co/AmineSam)
+* **Descrição**: Um modelo especializado baseado na arquitetura Ultralytics YOLOv8n, otimizado para detecção densa de cabeças e contagem de pessoas em cenários de alta aglomeração (como plataformas de embarque e áreas públicas).
+
+---
+
 ## 🏗️ Estrutura da Aplicação Isolada
 
 ```
@@ -19,7 +29,7 @@ count-github-yolo-01/app/
 │
 ├── input/
 │   └── videos/                        # Vídeos originais para processamento
-│       ├── muralha-dia.mp4     # Vídeo Diurno
+│       ├── muralha-dia.mp4           # Vídeo Diurno
 │       └── muralha-noite.mp4          # Vídeo Noturno
 │
 ├── weights/
@@ -72,7 +82,7 @@ Você pode rodar o processador de vídeo direto no console para o cenário desej
 Os resultados (estatísticas em JSON, contagem frame-a-frame em CSV e vídeos anotados) serão gerados respectivamente em `output/day/` e `output/night/`.
 
 ### Executar via Jupyter Notebook
-Abra o arquivo [`test-setup-11-heads-counting-enhanced.ipynb`](file:///c:/Users/patrickcruz/Documents/Professional/Github/contagem-de-pessoas/count-github-yolo-01/app/test-setup-11-heads-counting-enhanced.ipynb) no VSCode. Escolha o arquivo de configuração na primeira célula (`data_day.yaml` ou `data_night.yaml`) e execute as células sequencialmente.
+Abra o arquivo [`test-setup-11-heads-counting-enhanced.ipynb`](count-github-yolo-01/app/test-setup-11-heads-counting-enhanced.ipynb) no VSCode. Escolha o arquivo de configuração na primeira célula (`data_day.yaml` ou `data_night.yaml`) e execute as células sequencialmente.
 
 ---
 

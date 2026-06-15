@@ -1,3 +1,13 @@
+"""
+Video I/O Threading Module
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This module provides classes for multi-threaded video operations:
+- `VideoReader`: Decodes video frames in a background thread and enqueues them.
+- `VideoWriterWrapper`: Pulls prediction frames, applies visual overlays/annotations,
+  resizes, writes to disk, and saves periodic audit snapshots in a background thread.
+"""
+
 from __future__ import annotations
 import logging
 import queue
@@ -14,9 +24,25 @@ logger = logging.getLogger(__name__)
 
 
 class VideoReader:
-    """Multi-threaded video reader that decodes frames in a background thread."""
+    """Multi-threaded video reader that decodes frames in a background thread to prevent disk bottlenecks.
+
+    Attributes:
+        video_path: Path to the target video.
+        stride: Stride multiplier; process every N-th frame.
+        queue: Thread-safe queue containing decompressed frames and indices.
+        stop_event: Event to flag thread shutdown.
+        thread: Thread instance executing decoder worker.
+        metadata: Dict containing dimensions, framerate, frame count, duration, and size.
+    """
 
     def __init__(self, video_path: str | Path, stride: int = 1, queue_size: int = 128):
+        """Initializes VideoReader and extracts video file metadata.
+
+        Args:
+            video_path: File system path to the target video file.
+            stride: Stride factor for skipping frames.
+            queue_size: Maximum capacity of the frame buffer queue.
+        """
         self.video_path = Path(video_path)
         self.stride = max(1, stride)
         self.queue: queue.Queue[Tuple[np.ndarray, int] | Tuple[None, None]] = queue.Queue(maxsize=queue_size)
@@ -27,7 +53,12 @@ class VideoReader:
         self._validate_and_extract_metadata()
 
     def _validate_and_extract_metadata(self) -> None:
-        """Checks if the video is valid and retrieves metadata parameters."""
+        """Validates video file availability and retrieves dimensions and fps settings.
+
+        Raises:
+            FileNotFoundError: If the file does not exist.
+            RuntimeError: If OpenCV fails to open the video stream.
+        """
         if not self.video_path.exists():
             raise FileNotFoundError(f"Video file not found at: {self.video_path}")
 
@@ -53,21 +84,23 @@ class VideoReader:
         cap.release()
 
     def __enter__(self) -> VideoReader:
+        """Context manager entry; automatically starts the background reader thread."""
         self.start()
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager exit; automatically stops the reader thread and cleans up."""
         self.stop()
 
     def start(self) -> None:
-        """Starts the reader thread."""
+        """Starts the background video decoding thread."""
         self.stop_event.clear()
         self.thread = threading.Thread(target=self._reader_worker, daemon=True)
         self.thread.start()
         logger.info(f"Video reader thread started for: {self.video_path.name}")
 
     def stop(self) -> None:
-        """Signals reader thread to stop and joins it."""
+        """Signals background reader thread to stop and blocks until joined."""
         self.stop_event.set()
         
         # Drain queue if thread is blocked on a put
@@ -82,7 +115,11 @@ class VideoReader:
             logger.info("Video reader thread joined successfully.")
 
     def _reader_worker(self) -> None:
-        """Worker loop to decode video frames and push them to the queue."""
+        """Worker loop that runs in the background thread.
+
+        Sequentially reads frames, skips according to stride, and puts them into the queue.
+        Pushes (None, None) sentinel when complete.
+        """
         cap = cv2.VideoCapture(str(self.video_path))
         frame_idx = 0
 
@@ -111,7 +148,11 @@ class VideoReader:
                 pass
 
     def iter_frames(self) -> Generator[Tuple[np.ndarray, int], None, None]:
-        """Generator yielding frames and their source indices from the queue."""
+        """Iterates over frames as they become decoded and pushed to the queue.
+
+        Yields:
+            A tuple of (frame, frame_index).
+        """
         while not self.stop_event.is_set():
             frame, frame_idx = self.queue.get(block=True)
             if frame is None:
@@ -120,9 +161,23 @@ class VideoReader:
 
 
 class VideoWriterWrapper:
-    """Multi-threaded writer that annotates, resizes, and writes video frames in a background thread."""
+    """Multi-threaded writer that annotates, resizes, and writes video frames in a background thread.
+
+    Attributes:
+        config: The parsed PipelineConfig configuration.
+        video_meta: Video metadata used to match output resolution and framerates.
+        queue: Thread-safe queue containing inference results and annotations tasks.
+        stop_event: Event to flag thread shutdown.
+        thread: Thread instance executing writing worker.
+    """
 
     def __init__(self, config: PipelineConfig, video_meta: dict[str, Any]):
+        """Initializes VideoWriterWrapper and opens the target VideoWriter output.
+
+        Args:
+            config: A PipelineConfig instance.
+            video_meta: A dictionary containing dimensions and fps of the source video.
+        """
         self.config = config
         self.video_meta = video_meta
         self.queue: queue.Queue[Tuple[Any, int, int, float] | None] = queue.Queue(maxsize=128)
@@ -133,7 +188,7 @@ class VideoWriterWrapper:
         self._init_writer()
 
     def _init_writer(self) -> None:
-        """Initializes the OpenCV VideoWriter if configured."""
+        """Configures and opens the OpenCV VideoWriter object."""
         if not self.config.output.save_annotated_video:
             return
 
@@ -163,21 +218,23 @@ class VideoWriterWrapper:
             self._writer = None
 
     def __enter__(self) -> VideoWriterWrapper:
+        """Context manager entry; automatically starts the background writer worker."""
         self.start()
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager exit; automatically stops and clean up writer worker threads."""
         self.stop()
 
     def start(self) -> None:
-        """Starts the background writer worker."""
+        """Spawns and starts the background writer worker thread."""
         self.stop_event.clear()
         self.thread = threading.Thread(target=self._writer_worker, daemon=True)
         self.thread.start()
         logger.info("Video writer thread started.")
 
     def stop(self) -> None:
-        """Signals background thread to finish, joins it, and releases writer resources."""
+        """Pushes stop sentinel, waits for writer to finish queue items, and releases outputs."""
         if self.thread and self.thread.is_alive():
             # Send stop sentinel
             try:
@@ -193,14 +250,31 @@ class VideoWriterWrapper:
             logger.info("Released VideoWriter resource.")
 
     def write_result(self, result: Any, count: int, frame_idx: int, timestamp_sec: float) -> None:
-        """Enqueues inference results for processing and writing."""
+        """Enqueues inference results for plotting and writing.
+
+        Args:
+            result: YOLO Result object.
+            count: Number of heads detected.
+            frame_idx: Index of the current frame.
+            timestamp_sec: Frame time offset from the start of the video.
+        """
         try:
             self.queue.put((result, count, frame_idx, timestamp_sec), block=True, timeout=1.0)
         except queue.Full:
             logger.warning("Writer queue full. Dropping output frame index: %d", frame_idx)
 
     def _annotate_frame(self, result: Any, count: int, frame_idx: int, timestamp_sec: float) -> np.ndarray:
-        """Plots YOLO detections and renders statistics overlay on a frame copy."""
+        """Draws bounding boxes, head counts, frame index, and timestamps on a copy of the frame.
+
+        Args:
+            result: YOLO Result object.
+            count: Number of heads detected.
+            frame_idx: Current frame index.
+            timestamp_sec: Frame time stamp in seconds.
+
+        Returns:
+            A NumPy array of the annotated image.
+        """
         overlay_cfg = self.config.output.overlay
         if not overlay_cfg.enabled:
             return result.orig_img.copy()
@@ -242,7 +316,7 @@ class VideoWriterWrapper:
         return annotated
 
     def _writer_worker(self) -> None:
-        """Background worker loop reading results, drawing annotations, and writing frames/snapshots."""
+        """Background loop pulling tasks, running overlays, resizing, and writing frames/snapshots."""
         snapshot_every = self.config.output.save_snapshot_every_n_frames
         snapshots_dir = Path(self.config.paths.snapshots_dir)
 
